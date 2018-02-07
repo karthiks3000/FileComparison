@@ -6,10 +6,10 @@ import hashlib
 import sys
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font,colors
-
+from progress.bar import ChargingBar
 book = Workbook()
 
-font = Font(name='Calibri',
+f = Font(name='Calibri',
 size=11,
 bold=True,
 italic=False,
@@ -28,6 +28,7 @@ def md5Checksum(filePath):
                 break
             m.update(data)
         return m.hexdigest()
+
 
 # code starts here
 
@@ -55,25 +56,52 @@ print('')
 sheet1 = book.create_sheet('Results')
 
 sheet1.cell(1,1,'Source Folder: ')
-
+sheet1.cell(1,1).font= f
 sheet1.cell(1,2, sourceFolder)
 
 sheet1.cell(2,1,'Destination Folder:')
+sheet1.cell(2,1).font= f
+
 sheet1.cell(2,2, destinationFolder)
 
 sheet1.cell(5,1,'File Comparison Results:')
+sheet1.cell(5,1).font= f
 
 sheet1.cell(7,1,'Source File Path')
+sheet1.cell(7,1).font= f
+
 sheet1.cell(7,2,'Source File MD5')
+sheet1.cell(7,2).font= f
+
 sheet1.cell(7,3,'Destination File Path')
+sheet1.cell(7,3).font= f
+
 sheet1.cell(7,4,'Destination File MD5')
+sheet1.cell(7,4).font= f
+
 sheet1.cell(7,5,'Result')
+sheet1.cell(7,5).font= f
+
+sheet1.column_dimensions["A"].width = 50
+sheet1.column_dimensions["B"].width = 35
+sheet1.column_dimensions["C"].width = 50
+sheet1.column_dimensions["D"].width = 35
+sheet1.column_dimensions["E"].width = 50
 
 i = 8
+count = 0
+
+for (path, dirs, files) in os.walk(sourceFolder):
+    for file in files:
+        count = count + 1
+
+bar = ChargingBar('Processing', max=count)
 
 # for each file in source, compare with destination   
 for (path, dirs, files) in os.walk(sourceFolder):
     for file in files:
+        bar.next()
+
         source_filename = os.path.join(path, file)          
         sheet1.cell(i,1,source_filename)
         
@@ -107,15 +135,20 @@ for (path, dirs, files) in os.walk(sourceFolder):
             
 i=i+3
 sheet1.cell(i,1,'Size of files found in source')
+sheet1.cell(i,1).font= f
+
 sheet1.cell(i,2,'%0.1f MB' % (folder_size_source/(1024*1024.0)))
 
 i=i+1
 sheet1.cell(i,1,'Size of files found in destination')
+sheet1.cell(i,1).font= f
+
 sheet1.cell(i,2,'%0.1f MB' % (folder_size_destination/(1024*1024.0)))        
    
 print('')
 print("Source Folder Size: %0.1f MB" % (folder_size_source/(1024*1024.0)))
 print("Destination Folder Size = %0.1f MB" % (folder_size_destination/(1024*1024.0)))
 
+bar.finish()
 book.save('Result.xlsx')
 
