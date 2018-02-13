@@ -1,12 +1,95 @@
-# This program compares 2 folders and spits out an excel with the results
+#The Code will compare the files and folders in Scrounger NY with Scrounger AWS
 
-import Tkinter,tkFileDialog
+# Using Python3
+from tkinter import Tk,filedialog  ## notice lowercase 't' in tkinter here
+
 import os
+import scandir
 import hashlib
 import sys
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font,colors
-from progress.bar import ChargingBar
+from tqdm import tqdm
+
+class FileData:
+    SourceFileName = ''
+    DestinationFileName = ''
+    SourceMD5 = ''
+    DestinationMD5 =''
+    ComparisonResult = ''
+
+    # function to calculate the checksum value of the provided file path
+    def md5Checksum(self, file_name):
+        with open(file_name, 'rb') as fh:
+            m = hashlib.md5()
+            while True:
+                data = fh.read(8192)
+                if not data:
+                    break
+                m.update(data)
+            return m.hexdigest()
+    
+
+# code starts here
+
+root = Tk()
+root.withdraw()
+folder_size_source = 0
+folder_size_destination = 0
+
+
+# Selects the Source Folder
+sourceFolder = filedialog.askdirectory()
+# Selects the Destination Folder
+destinationFolder = filedialog.askdirectory()
+print('Source Path: ' + sourceFolder)
+print('')
+
+print('Destination Path: ' + destinationFolder)
+print('')
+
+listOfFiles = []
+i = 0
+# for each file in source, compare with destination   
+print('Starting lookup....')
+
+for (path, dirs, files) in tqdm(scandir.walk(sourceFolder)):
+    for file in files:        
+        fileObject = FileData()                 
+        
+        fileObject.SourceFileName = os.path.join(path, file)
+        fileObject.DestinationFileName = os.path.join(destinationFolder, os.path.relpath(path,sourceFolder))
+        fileObject.DestinationFileName = os.path.join(fileObject.DestinationFileName,file)
+        
+        folder_size_source += os.path.getsize(fileObject.SourceFileName)
+        
+        if(os.path.isfile(fileObject.DestinationFileName)):                
+
+            folder_size_destination += os.path.getsize(fileObject.DestinationFileName)    
+
+            fileObject.SourceMD5 =  fileObject.md5Checksum(fileObject.SourceFileName)
+            fileObject.DestinationMD5 =  fileObject.md5Checksum(fileObject.DestinationFileName)  
+            
+            #Compare the checksum of Source and Files
+            if(fileObject.SourceMD5 != fileObject.DestinationMD5):
+                # sheet1.cell(i,5,'Checksum does not match')
+                fileObject.ComparisonResult = 'Checksum does not match'
+            else:
+                # sheet1.cell(i,5,'Checksum matched')
+                fileObject.ComparisonResult = 'Checksum matched'
+                              
+        else:
+            # sheet1.cell(i,5,destination_filename + ' does not exist')            
+            fileObject.ComparisonResult = fileObject.DestinationFileName + ' does not exist'
+        
+        listOfFiles.insert(i,fileObject)
+        i = i + 1
+        
+        
+        
+# logic to print data to excel
+print('Hang tight...Printing results to excel....')
+
 book = Workbook()
 
 f = Font(name='Calibri',
@@ -16,42 +99,7 @@ italic=False,
 vertAlign=None,
 underline='none',
 strike=False,
-color=colors.RED)
-
-# function to calculate the checksum value of the provided file path
-def md5Checksum(filePath):
-    with open(filePath, 'rb') as fh:
-        m = hashlib.md5()
-        while True:
-            data = fh.read(8192)
-            if not data:
-                break
-            m.update(data)
-        return m.hexdigest()
-
-
-# code starts here
-
-root = Tkinter.Tk()
-root.withdraw()
-folder_size_source = 0
-folder_size_destination = 0
-
-
-# Selects the Source Folder
-sourceFolder = tkFileDialog.askdirectory()
-# sourceFolder = 'C:\Users\subramak\Downloads\Test'
-
-print('Source Path: ' + sourceFolder)
-print('')
-
-# Selects the Destination Folder
-destinationFolder = tkFileDialog.askdirectory()
-# destinationFolder = 'C:\Users\subramak\Downloads\Test - Copy'
-
-print('Destination Path: ' + destinationFolder)
-print('')
-   
+color=colors.RED)  
 
 sheet1 = book.create_sheet('Results')
 
@@ -61,7 +109,6 @@ sheet1.cell(1,2, sourceFolder)
 
 sheet1.cell(2,1,'Destination Folder:')
 sheet1.cell(2,1).font= f
-
 sheet1.cell(2,2, destinationFolder)
 
 sheet1.cell(5,1,'File Comparison Results:')
@@ -89,50 +136,17 @@ sheet1.column_dimensions["D"].width = 35
 sheet1.column_dimensions["E"].width = 50
 
 i = 8
-count = 0
 
-for (path, dirs, files) in os.walk(sourceFolder):
-    for file in files:
-        count = count + 1
+# add data from list
 
-bar = ChargingBar('Processing', max=count)
-
-# for each file in source, compare with destination   
-for (path, dirs, files) in os.walk(sourceFolder):
-    for file in files:
-        bar.next()
-
-        source_filename = os.path.join(path, file)          
-        sheet1.cell(i,1,source_filename)
+for file in listOfFiles:
+    sheet1.cell(i,1,file.SourceFileName)
+    sheet1.cell(i,2,file.SourceMD5)
+    sheet1.cell(i,3,file.DestinationFileName)
+    sheet1.cell(i,4,file.DestinationMD5)
+    sheet1.cell(i,5,file.ComparisonResult)
+    i = i + 1
         
-        destination_filename = os.path.join(destinationFolder, os.path.relpath(path,sourceFolder))
-        destination_filename = os.path.join(destination_filename,file)
-        
-        folder_size_source += os.path.getsize(source_filename)
-        
-        if(os.path.isfile(destination_filename)):    
-
-            sheet1.cell(i,3,destination_filename)   
-
-            folder_size_destination += os.path.getsize(destination_filename)    
-
-            SourceCheckSum = md5Checksum(source_filename)
-            sheet1.cell(i,2,SourceCheckSum)   
-            
-            DestinationCheckSum = md5Checksum(destination_filename)
-            sheet1.cell(i,4,DestinationCheckSum)   
-            
-            #Compare the checksum of Source and Files
-            if(SourceCheckSum != DestinationCheckSum):
-                sheet1.cell(i,5,'Checksum does not match')
-            else:
-                sheet1.cell(i,5,'Checksum matched')
-                      
-        else:
-            sheet1.cell(i,5,destination_filename + ' does not exist')            
-        
-        i = i+1
-            
 i=i+3
 sheet1.cell(i,1,'Size of files found in source')
 sheet1.cell(i,1).font= f
@@ -149,6 +163,4 @@ print('')
 print("Source Folder Size: %0.1f MB" % (folder_size_source/(1024*1024.0)))
 print("Destination Folder Size = %0.1f MB" % (folder_size_destination/(1024*1024.0)))
 
-bar.finish()
 book.save('Result.xlsx')
-
